@@ -1,4 +1,4 @@
-import CreatorReward from "../../models/CreatorReward.js";
+import CreatorReward from "../../models/creatorReward.js";
 import AppError from "../../utils/AppError.js";
 
 export const prepareRewardClaim = async ({ creator, tokenId }) => {
@@ -41,6 +41,10 @@ export const prepareRewardClaim = async ({ creator, tokenId }) => {
 
     amount: reward.pendingAmount,
 
-    contractMethod: "claim_creator_rewards",
+    contractMethod: "claim_rewards",
+    contractArgs: {
+      token_contract_id: reward.tokenContractId,
+      quote_asset_id: reward.quoteTokenId,
+    },
   };
 };

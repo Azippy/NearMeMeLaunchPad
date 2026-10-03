@@ -28,6 +28,8 @@ const tokenSchema = new mongoose.Schema(
       uppercase: true,
       trim: true,
       maxlength: 20,
+      unique: true,
+      index: true,
     },
 
     decimals: {

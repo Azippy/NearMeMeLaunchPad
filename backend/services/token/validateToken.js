@@ -1,29 +1,42 @@
 import AppError from "../../utils/AppError.js";
-import { TRADING_TAX } from "../../config/constants.js";
+
+const isNearAccountId = (value) => {
+  if (typeof value !== "string" || value.length < 2 || value.length > 64) {
+    return false;
+  }
+
+  return /^(?:[a-z0-9]+(?:[._-][a-z0-9]+)*)$/.test(value);
+};
 
 const isValidUrl = (value) => {
   if (!value) return true;
 
   try {
-    new URL(value);
-    return true;
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
   } catch {
     return false;
   }
 };
 
 const validatePercentage = (value, fieldName) => {
+  const roundedBps = Math.round(value * 100);
   if (
     typeof value !== "number" ||
     !Number.isFinite(value) ||
     value < 0 ||
-    value > 10
+    value > 10 ||
+    Math.abs(value * 100 - roundedBps) > 1e-9
   ) {
     throw new AppError(`${fieldName} must be between 0% and 10%`, 400);
   }
 };
 
 const validateTokenCreation = (data) => {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new AppError("Token request body must be an object", 400);
+  }
+
   const {
     creator,
     name,
@@ -49,28 +62,28 @@ const validateTokenCreation = (data) => {
   // REQUIRED TOKEN INFORMATION
   // -------------------------
 
-  if (!creator) {
-    throw new AppError("Creator wallet address is required", 400);
+  if (!isNearAccountId(creator)) {
+    throw new AppError("Creator must be a valid NEAR account ID", 400);
   }
 
-  if (!name || !name.trim()) {
+  if (typeof name !== "string" || !name.trim()) {
     throw new AppError("Token name is required", 400);
   }
 
-  if (!symbol || !symbol.trim()) {
+  if (typeof symbol !== "string" || !symbol.trim()) {
     throw new AppError("Token symbol is required", 400);
   }
 
-  if (!logo || !logo.trim()) {
-    throw new AppError("Token logo is required", 400);
+  if (typeof logo !== "string" || !isValidUrl(logo.trim())) {
+    throw new AppError("Token logo must be a valid HTTP(S) URL", 400);
   }
 
-  if (!description || !description.trim()) {
+  if (typeof description !== "string" || !description.trim()) {
     throw new AppError("Token description is required", 400);
   }
 
-  if (name.trim().length > 100) {
-    throw new AppError("Token name cannot exceed 100 characters", 400);
+  if (name.trim().length > 50) {
+    throw new AppError("Token name cannot exceed 50 characters", 400);
   }
 
   if (symbol.trim().length > 20) {
@@ -100,7 +113,11 @@ const validateTokenCreation = (data) => {
   };
 
   for (const [field, value] of Object.entries(optionalLinks)) {
-    if (value && !isValidUrl(value)) {
+    if (value !== undefined && value !== null && typeof value !== "string") {
+      throw new AppError(`${field} must be a URL string`, 400);
+    }
+
+    if (value && !isValidUrl(value.trim())) {
       throw new AppError(`${field} must be a valid URL`, 400);
     }
   }

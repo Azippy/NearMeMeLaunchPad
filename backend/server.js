@@ -10,8 +10,11 @@ const startServer = async () => {
 
     console.log(`Environment: ${env.nodeEnv}`);
 
-    console.log(`NEAR network: ${env.nearNetwork}`);
+    console.log(`NEAR network: ${env.near.network}`);
   });
 };
 
-startServer();
+startServer().catch((error) => {
+  console.error(error.message);
+  process.exitCode = 1;
+});

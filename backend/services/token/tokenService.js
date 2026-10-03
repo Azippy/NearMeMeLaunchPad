@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-import Token from "../../models/Token.js";
+import Token from "../../models/token.js";
 import AppError from "../../utils/AppError.js";
 import validateTokenCreation from "./validateToken.js";
 
@@ -65,6 +65,11 @@ export const createToken = async (data) => {
       liquidityPercent: validatedData.liquidityPercent,
 
       burnPercent: validatedData.burnPercent,
+    },
+
+    tradingTax: {
+      buyTaxBps: validatedData.buyTaxBps,
+      sellTaxBps: validatedData.sellTaxBps,
     },
   });
 

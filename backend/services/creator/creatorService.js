@@ -1,5 +1,5 @@
-import Token from "../../models/Token.js";
-import CreatorReward from "../../models/CreatorReward.js";
+import Token from "../../models/token.js";
+import CreatorReward from "../../models/creatorReward.js";
 import AppError from "../../utils/AppError.js";
 
 export const getCreatorTokens = async (wallet) => {

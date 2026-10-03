@@ -1,15 +1,27 @@
 import { LAUNCH_MODES, BONDING_CURVE_TYPES } from "../../config/constants.js";
 
+const U128_MAX = (1n << 128n) - 1n;
+
+const isNearAccountId = (value) =>
+  typeof value === "string" &&
+  value.length >= 2 &&
+  value.length <= 64 &&
+  /^(?:[a-z0-9]+(?:[._-][a-z0-9]+)*)$/.test(value);
+
+const isMongoObjectId = (value) =>
+  typeof value === "string" && /^[a-f\d]{24}$/i.test(value);
+
 const isPositiveIntegerString = (value) => {
   if (typeof value !== "string") {
     return false;
   }
 
-  if (!/^\d+$/.test(value)) {
+  if (!/^\d+$/.test(value) || value.length > 39) {
     return false;
   }
 
-  return BigInt(value) > 0n;
+  const parsed = BigInt(value);
+  return parsed > 0n && parsed <= U128_MAX;
 };
 
 const isNonNegativeIntegerString = (value) => {
@@ -17,11 +29,19 @@ const isNonNegativeIntegerString = (value) => {
     return false;
   }
 
-  return /^\d+$/.test(value);
+  if (!/^\d+$/.test(value) || value.length > 39) {
+    return false;
+  }
+
+  return BigInt(value) <= U128_MAX;
 };
 
 export const validateLaunch = (data) => {
   const errors = [];
+
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return { valid: false, errors: ["Launch request body must be an object"] };
+  }
 
   const { creator, tokenContractId, tokenId, mode } = data;
 
@@ -29,16 +49,20 @@ export const validateLaunch = (data) => {
   // BASIC VALIDATION
   // -------------------------
 
-  if (!creator) {
-    errors.push("Creator account ID is required");
+  if (!isNearAccountId(creator)) {
+    errors.push("Creator must be a valid NEAR account ID");
   }
 
-  if (!tokenContractId) {
-    errors.push("Token contract ID is required");
+  if (
+    typeof tokenContractId !== "string" ||
+    tokenContractId.trim().length === 0 ||
+    tokenContractId.length > 128
+  ) {
+    errors.push("Token contract ID must be a non-empty string");
   }
 
-  if (!tokenId) {
-    errors.push("Token ID is required");
+  if (!isMongoObjectId(tokenId)) {
+    errors.push("Token ID must be a valid MongoDB ObjectId");
   }
 
   if (!mode) {

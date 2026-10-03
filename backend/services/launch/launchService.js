@@ -1,13 +1,23 @@
 import crypto from "crypto";
 import Launch from "../../models/launch.js";
 import Token from "../../models/token.js";
+import PairAsset from "../../models/pairAsset.js";
 import AppError from "../../utils/AppError.js";
 
-import { LAUNCH_MODES, LAUNCH_STATUS } from "../../config/constants.js";
+import {
+  LAUNCH_MODES,
+  LAUNCH_STATUS,
+  NATIVE_NEAR,
+} from "../../config/constants.js";
+import env from "../../config/env.js";
 
 import { validateLaunch } from "./validateLaunch.js";
 
-const launchId = `NMP-${crypto.randomUUID()}`;
+const isNearAccountId = (value) =>
+  typeof value === "string" &&
+  value.length >= 2 &&
+  value.length <= 64 &&
+  /^(?:[a-z0-9]+(?:[._-][a-z0-9]+)*)$/.test(value);
 
 const createLaunch = async (data) => {
   const validation = validateLaunch(data);
@@ -34,6 +44,10 @@ const createLaunch = async (data) => {
 
   if (!token) {
     throw new AppError("Token record not found", 404);
+  }
+
+  if (token.creator !== creator) {
+    throw new AppError("Only the token creator can launch this token", 403);
   }
 
   if (token.contractId !== tokenContractId) {
@@ -65,10 +79,30 @@ const createLaunch = async (data) => {
   // CREATE INTERNAL LAUNCH ID
   // -------------------------
 
-  const launchId = `NMP-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)
-    .toUpperCase()}`;
+  const launchId = `NMP-${crypto.randomUUID()}`;
+
+  const quoteAssetId =
+    mode === LAUNCH_MODES.DIRECT_MARKET
+      ? directMarket.quoteTokenId
+      : bondingCurve.quoteAssetId || NATIVE_NEAR.assetId;
+
+  const quoteAsset =
+    quoteAssetId === NATIVE_NEAR.assetId
+      ? {
+          assetType: "NATIVE_NEAR",
+          decimals: NATIVE_NEAR.decimals,
+        }
+      : await PairAsset.findOne({
+          contractId: quoteAssetId,
+          enabled: true,
+        }).lean();
+
+  if (!quoteAsset) {
+    throw new AppError("Quote asset is not enabled", 400);
+  }
+
+  const quoteAssetType =
+    quoteAsset.assetType === "native" ? "NATIVE_NEAR" : quoteAsset.assetType;
 
   // -------------------------
   // BUILD DOCUMENT
@@ -90,7 +124,11 @@ const createLaunch = async (data) => {
     status: LAUNCH_STATUS.PENDING,
 
     blockchain: {
-      network: "testnet",
+      network: env.near.network,
+      factoryContractId: env.near.factoryContractId,
+      quoteAsset: quoteAssetId,
+      quoteAssetType,
+      quoteAssetDecimals: quoteAsset.decimals,
     },
   };
 
@@ -144,6 +182,26 @@ const createLaunch = async (data) => {
 };
 
 const getLaunches = async ({ mode, status, creator, page = 1, limit = 20 }) => {
+  if (!Number.isSafeInteger(page) || page < 1) {
+    throw new AppError("Page must be a positive integer", 400);
+  }
+
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    throw new AppError("Limit must be an integer between 1 and 100", 400);
+  }
+
+  if (mode !== undefined && !Object.values(LAUNCH_MODES).includes(mode)) {
+    throw new AppError("Invalid launch mode", 400);
+  }
+
+  if (status !== undefined && !Object.values(LAUNCH_STATUS).includes(status)) {
+    throw new AppError("Invalid launch status", 400);
+  }
+
+  if (creator !== undefined && !isNearAccountId(creator)) {
+    throw new AppError("Creator must be a valid NEAR account ID", 400);
+  }
+
   const filter = {};
 
   if (mode) {
